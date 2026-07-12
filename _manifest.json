@@ -1,0 +1,41 @@
+{
+  "manifest_version": 2,
+  "version": "2.1.1",
+  "name": "QQPilot适配器",
+  "description": "适用于QQPilot1.5.14+以上",
+  "author": {
+    "name": "Na2Cr2O7",
+    "url": "https://example.com"
+  },
+  "license": "CC-BY",
+  "urls": {
+    "repository": "https://example.com",
+    "homepage": "https://example.com",
+    "documentation": "https://example.com",
+    "issues": "https://example.com"
+  },
+  "changelog": "CHANGELOG.md",
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.0.0"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [],
+  "capabilities": [
+    "send.text",
+    "send.forward",
+    "send.hybrid",
+    "config.get"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "locales_path": "_locales",
+    "supported_locales": [
+      "zh-CN"
+    ]
+  },
+  "id": "com.na2cr2o7.qqpilot"
+}
