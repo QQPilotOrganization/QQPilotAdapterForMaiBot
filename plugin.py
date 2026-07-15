@@ -1,12 +1,12 @@
 import threading
 import os
 import base64
-from typing import Any, List
+from typing import Any, List, ClassVar
 import socketserver
 from concurrent.futures import Future
 from datetime import datetime
 import hashlib
-from maibot_sdk import MaiBotPlugin, MessageGateway
+from maibot_sdk import MaiBotPlugin, MessageGateway, Field, PluginConfigBase
 import asyncio
 import time
 
@@ -86,6 +86,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         reply_text = "......"
 
         try:
+            if gateway._delete_image_in_next_request and gateway._last_saved_images:
+                deleted_count = 0
+                for img_path in gateway._last_saved_images:
+                    try:
+                        os.remove(img_path)
+                        deleted_count += 1
+                        print(f"🗑️ 删除上一次回复的图片: {img_path}")
+                    except Exception as e:
+                        print(f"⚠️ 删除图片失败: {img_path}, 错误: {e}")
+                gateway._last_saved_images.clear()
+                print(f"✅ 已删除 {deleted_count} 张图片")
+            
             chatlist=[]
             messages_to_send=[]
             containsNewMassage=False
@@ -178,6 +190,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with gateway._reply_lock:
                 gateway._replies = []
 
+            usernames = {msg["username"] for msg in messages_to_send}
+            is_private_chat = len(usernames) == 1
+            
+            print(f"🔍 检测到 {len(usernames)} 个不同用户，私聊模式: {is_private_chat}")
+            
             for msg in messages_to_send:
                 timestamp_str = msg["timestamp"]
                 username = msg["username"]
@@ -194,11 +211,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 resultDict['user_id']=f"qqpilot_user_{hash(username) & 0xFFFFFFFFFFFFFFFF}"
                 resultDict['nickname']=username
                 resultDict['message']=content
-                resultDict['groupID']=group_id
-                resultDict['groupName']=group_name
                 resultDict['timestamp']=timestamp_str
                 resultDict['images']=images
                 resultDict['emojis']=emojis
+                
+                if is_private_chat:
+                    resultDict['groupID'] = ""
+                    resultDict['groupName'] = ""
+                    print(f"📩 私聊消息，不包含群信息")
+                else:
+                    resultDict['groupID']=group_id
+                    resultDict['groupName']=group_name
 
                 asyncio.run_coroutine_threadsafe(gateway.handle_inbound(resultDict), gateway._loop)
 
@@ -206,31 +229,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             groupChatManager.add_messages_to_group(group_id, new_messages)
 
             try:
-                timeout = 120
+                total_timeout = 180
+                idle_timeout = 30
                 last_count = -1
                 wait_time = 0
+                total_wait_time = 0
 
-                while wait_time < timeout:
+                while total_wait_time < total_timeout:
                     with gateway._reply_lock:
                         current_count = len(gateway._replies)
 
                     if current_count > last_count:
                         last_count = current_count
                         wait_time = 0
+                        print(f"🔄 收到新回复，当前共 {current_count} 条")
                     else:
                         wait_time += 0.5
 
+                    total_wait_time += 0.5
                     time.sleep(0.5)
 
                     with gateway._reply_lock:
-                        if len(gateway._replies) > 0 and wait_time >= 10:
-                            error("[超时了超时了超时了超时了超时了超时了超时了超时了超时了超时了超时了超时了]")
+                        if len(gateway._replies) > 0 and wait_time >= idle_timeout:
+                            print(f"⏰ 连续 {idle_timeout} 秒无新回复，结束等待")
                             break
 
                 with gateway._reply_lock:
                     if gateway._replies:
                         reply_text = "[[NEXT]]".join(gateway._replies)
-                        print(f"✅ 收到 {len(gateway._replies)} 条回复: {reply_text}")
+                        print(f"✅ 收到 {len(gateway._replies)} 条回复，总等待时间: {total_wait_time:.1f}秒")
+                        print(f"✅ 回复内容: {reply_text}")
                     else:
                         reply_text = ""
 
@@ -275,7 +303,62 @@ print=None
 warn=None
 error=None
 groupChatManager=GroupChatManager()
+
+class QQPilotPluginOptions(PluginConfigBase):
+    """插件级配置。"""
+    __ui_label__ = "插件设置"
+    __ui_order__ = 0
+
+    enabled: bool = Field(
+        default=True,
+        description="是否启用 QQPilot 适配器。",
+        json_schema_extra={
+            "label": "启用适配器",
+            "order": 0,
+        },
+    )
+    config_version: str = Field(
+        default="2.0.0",
+        description="当前配置结构版本。",
+        json_schema_extra={
+            "disabled": True,
+            "hidden": True,
+            "label": "配置版本",
+            "order": 99,
+        },
+    )
+
+class QQPilotImageOptions(PluginConfigBase):
+    """图片相关配置。"""
+    __ui_label__ = "图片设置"
+    __ui_order__ = 1
+
+    ImagePath: str = Field(
+        default="images",
+        description="图片保存路径。",
+        json_schema_extra={
+            "label": "图片保存路径",
+            "order": 0,
+        },
+    )
+    
+    deleteImageInTheNextRequest: bool = Field(
+        default=False,
+        description="是否在下一次请求时删除上一次回复生成的图片。",
+        json_schema_extra={
+            "label": "下一次请求时删除图片",
+            "order": 1,
+        },
+    )
+
 class Gateway(MaiBotPlugin):
+    config_model: ClassVar[type[PluginConfigBase] | None] = None
+    
+    def __init__(self) -> None:
+        super().__init__()
+        self._image_path = "images"
+        self._delete_image_in_next_request = False
+        self._last_saved_images: List[str] = []
     
     async def on_load(self) -> None:
         # 上报网关就绪状态
@@ -316,8 +399,13 @@ class Gateway(MaiBotPlugin):
         # self.ctx.logger.info(f"Server started at http://localhost:{port}/")
         self.httpd.serve_forever()
     async def on_config_update(self, scope: str, config_data: dict, version: str) -> None:
-        # self.ctx.logger.info(f'repeater{config_data["repeat"]["repeater"]}')
-        pass
+        if "image" in config_data:
+            if "ImagePath" in config_data["image"]:
+                self._image_path = config_data["image"]["ImagePath"]
+                self.ctx.logger.info(f'图片保存路径已更新: {self._image_path}')
+            if "deleteImageInTheNextRequest" in config_data["image"]:
+                self._delete_image_in_next_request = config_data["image"]["deleteImageInTheNextRequest"]
+                self.ctx.logger.info(f'下一次请求删除图片: {self._delete_image_in_next_request}')
 
     def Print(self,content):
         self.ctx.logger.info(content)
@@ -337,10 +425,24 @@ class Gateway(MaiBotPlugin):
         **kwargs: Any,
     ) -> dict[str, Any]:
         """出站：将 Host 消息转发到外部平台。"""
-        # self.ctx.logger.info(f"message{message},route{route},{metadata},{kwargs}")
+        # 调试日志：查看完整消息结构
+        raw_message = message.get("raw_message", [])
+        print(f"\n📤 send_to_platform 被调用")
+        print(f"📤 raw_message 段数: {len(raw_message)}")
+        for i, segment in enumerate(raw_message):
+            seg_type = segment.get("type", "")
+            if seg_type == "text":
+                data = segment.get("data", "")
+                text_content = ""
+                if isinstance(data, str):
+                    text_content = data
+                elif isinstance(data, dict):
+                    text_content = data.get("text", "")
+                print(f"📤 段 {i}: type={seg_type}, 长度={len(text_content)}, 内容前50字='{text_content[:50]}...'")
+            else:
+                print(f"📤 段 {i}: type={seg_type}")
         
         reply_text = ""
-        raw_message = message.get("raw_message", [])
         for segment in raw_message:
             segment_type = segment.get("type", "")
             
@@ -356,6 +458,8 @@ class Gateway(MaiBotPlugin):
                 if base64_data:
                     self._save_image(base64_data)
         
+        print(f"📤 合并后回复文本长度: {len(reply_text)}")
+        
         if reply_text:
             with self._reply_lock:
                 self._replies.append(reply_text)
@@ -364,8 +468,12 @@ class Gateway(MaiBotPlugin):
         return {"success": True, "external_message_id": 1}
     
     def _save_image(self, base64_data: str) -> None:
-        """将 base64 图片数据保存到本地 images 文件夹。"""
-        images_dir = os.path.join(os.path.dirname(__file__), "images")
+        """将 base64 图片数据保存到配置指定的路径。"""
+        image_path = self._image_path
+        if not os.path.isabs(image_path):
+            images_dir = os.path.join(os.path.dirname(__file__), image_path)
+        else:
+            images_dir = image_path
         os.makedirs(images_dir, exist_ok=True)
         
         try:
@@ -377,6 +485,7 @@ class Gateway(MaiBotPlugin):
             with open(filepath, "wb") as f:
                 f.write(image_data)
             
+            self._last_saved_images.append(filepath)
             self.ctx.logger.info(f"图片已保存: {filepath}")
         except Exception as e:
             self.ctx.logger.error(f"保存图片失败: {e}")
@@ -448,26 +557,34 @@ class Gateway(MaiBotPlugin):
         is_emoji = len(emoji_urls) > 0
         is_picture = len(image_urls) > 0
         
+        # 构建消息信息，根据是否为私聊决定是否包含群信息
+        message_info = {
+            "platform": PLATFORM,
+            "message_id": msg_id,
+            "time": int(timestamp_seconds),
+            "user_info": {
+                "user_id": payload["user_id"],
+                "user_nickname": payload["nickname"],
+            },
+            "additional_config": {},
+        }
+        
+        group_id = payload.get("groupID", "")
+        group_name = payload.get("groupName", "")
+        
+        if group_id and group_name:
+            message_info["group_info"] = {
+                "group_id": group_id,
+                "group_name": group_name,
+            }
+        
         accepted = await self.ctx.gateway.route_message(
             gateway_name=GATEWAY_NAME,
             message={
                 "message_id": msg_id,
                 "timestamp": str(float(timestamp_seconds)),
                 "platform": PLATFORM,
-                "message_info": {
-                    "platform": PLATFORM,
-                    "message_id": msg_id,
-                    "time": int(timestamp_seconds),
-                    "user_info": {
-                        "user_id": payload["user_id"],
-                        "user_nickname": payload["nickname"],
-                    },
-                    "group_info": {
-                        "group_id": payload["groupID"],
-                        "group_name": payload['groupName'],
-                    },
-                    "additional_config": {},
-                },
+                "message_info": message_info,
                 "raw_message": raw_message,
                 "processed_plain_text": content,
                 "display_message": content,
