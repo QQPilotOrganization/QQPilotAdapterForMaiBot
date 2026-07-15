@@ -100,6 +100,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             
             chatlist=[]
             messages_to_send=[]
+            all_usernames = set()
             containsNewMassage=False
             for i in ctr:
                 if i['role'] != 'user':
@@ -148,6 +149,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     print(f"✅ content: {content}")
                     print(f"✅ images: {len(image_urls)}, emojis: {len(emoji_urls)}")
                     chatlist.append([username,content])
+                    all_usernames.add(username)
                     if not groupChatManager.message_exists(buildText(username, content)):
                         messages_to_send.append({
                             "timestamp": timestamp_str,
@@ -190,10 +192,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with gateway._reply_lock:
                 gateway._replies = []
 
-            usernames = {msg["username"] for msg in messages_to_send}
-            is_private_chat = len(usernames) == 1
+            is_private_chat = len(all_usernames) == 1
             
-            print(f"🔍 检测到 {len(usernames)} 个不同用户，私聊模式: {is_private_chat}")
+            print(f"🔍 检测到 {len(all_usernames)} 个不同用户（包括已存在的消息），私聊模式: {is_private_chat}")
             
             for msg in messages_to_send:
                 timestamp_str = msg["timestamp"]
