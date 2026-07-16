@@ -148,9 +148,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     print(f"✅ username: {username}")
                     print(f"✅ content: {content}")
                     print(f"✅ images: {len(image_urls)}, emojis: {len(emoji_urls)}")
-                    chatlist.append([username,content])
+                    chatlist.append([timestamp_str, username, content])
                     all_usernames.add(username)
-                    if not groupChatManager.message_exists(buildText(username, content)):
+                    if not groupChatManager.message_exists(buildText(timestamp_str,username, content)):
                         messages_to_send.append({
                             "timestamp": timestamp_str,
                             "username": username,
@@ -226,7 +226,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
                 asyncio.run_coroutine_threadsafe(gateway.handle_inbound(resultDict), gateway._loop)
 
-            new_messages = [[m["username"], m["content"]] for m in messages_to_send]
+            new_messages = [[m["timestamp"], m["username"], m["content"]] for m in messages_to_send]
             groupChatManager.add_messages_to_group(group_id, new_messages)
 
             try:

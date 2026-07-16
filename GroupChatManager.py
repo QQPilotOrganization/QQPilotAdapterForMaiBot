@@ -4,8 +4,8 @@ import os
 import threading
 import time
 from typing import Any, List, Tuple, Optional, Dict
-def buildText(username,content):
-    return f"{username}:{content}"
+def buildText(time,username,content):
+    return f"[{time}]{username}:{content}"
 
 class GroupChatManager:
     def __init__(self, db_path: str = None): # type: ignore
@@ -97,8 +97,8 @@ class GroupChatManager:
             return self.create_new_group()
 
         all_keywords: List[str] = []
-        for username, content in messages:
-            all_keywords.extend(self._extract_keywords(buildText(username,content)))
+        for time_str, username, content in messages:
+            all_keywords.extend(self._extract_keywords(buildText(time_str, username, content)))
 
         if not all_keywords:
             return self.create_new_group()
@@ -124,8 +124,8 @@ class GroupChatManager:
         return self.create_new_group()
 
     def add_messages_to_group(self, group_id: str, messages: List[List[str]]) -> None:
-        for username, content in messages:
-            text = buildText(username, content)
+        for time_str, username, content in messages:
+            text = buildText(time_str, username, content)
             if not self.message_exists(text):
                 self._add_message(group_id, text)
                 self._update_group_keywords(group_id, self._extract_keywords(text))
