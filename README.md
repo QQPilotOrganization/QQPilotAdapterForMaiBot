@@ -3,7 +3,7 @@
  > 为QQPilot适配的[MaiBot](https://docs.mai-mai.org/)适配器
 
  >⚠ 项目已经停止维护，请改为使用 [CompletionConnector](https://github.com/QQPilotOrganization/CompletionConnector-For-QQPilot)这还能复用OneBot的生态不好吗
-
+  
 安装适配器请参考MaiBot的教程。![alt text](image-2.png)
 同时,在麦麦设置的平台中填写QQPilot,账号随意
 示例:![alt text](image.png)
