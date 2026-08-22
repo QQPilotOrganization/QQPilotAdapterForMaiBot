@@ -444,6 +444,7 @@ class Gateway(MaiBotPlugin):
                 print(f"📤 段 {i}: type={seg_type}")
         
         reply_text = ""
+        has_image_or_emoji = False
         for segment in raw_message:
             segment_type = segment.get("type", "")
             
@@ -455,13 +456,14 @@ class Gateway(MaiBotPlugin):
                     reply_text += data.get("text", "")
             
             elif segment_type in ("emoji", "image"):
+                has_image_or_emoji = True
                 base64_data = segment.get("binary_data_base64", "")
                 if base64_data:
                     self._save_image(base64_data)
         
-        print(f"📤 合并后回复文本长度: {len(reply_text)}")
+        print(f"📤 合并后回复文本长度: {len(reply_text)}, 是否有图片/表情包: {has_image_or_emoji}")
         
-        if reply_text:
+        if reply_text or has_image_or_emoji:
             with self._reply_lock:
                 self._replies.append(reply_text)
                 self._last_reply_time = time.time()
