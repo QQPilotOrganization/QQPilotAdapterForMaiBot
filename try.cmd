@@ -1,0 +1,2 @@
+curl http://127.0.0.1:7749/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\":\"A\",\"messages\":[{\"role\":\"user\",\"content\":\"[time] 2023-10-17 10:00 [username] Alice [content] 你好，请问在吗？\"}]}"
+pause
