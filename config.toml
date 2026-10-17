@@ -1,7 +1,31 @@
 [plugin]
 enabled = true
-config_version = "2.0.0"
+account_id = "qqpilot"
+config_version = "2.1.0"
+
+[server]
+host = "127.0.0.1"
+port = 7749
+auth_token = ""
+max_body_mb = 32
+
+[reply]
+total_timeout_sec = 120.0
+idle_timeout_sec = 15.0
 
 [image]
-ImagePath="./Image"
-deleteImageInTheNextRequest=true
+path = ""
+save_to_disk = false
+delete_after_next_request = false
+max_reply_images = 9
+ImagePath = ""
+deleteImageInTheNextRequest = false
+
+[conversation]
+single_user_as_private = true
+overlap_threshold = 0.1
+member_overlap_threshold = 0.8
+retention_days = 0
+
+[debug]
+log_requests = false
