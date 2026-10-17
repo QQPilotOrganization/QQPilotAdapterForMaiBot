@@ -9,7 +9,7 @@ QQPilot 会把聊天记录拼成：
 [time] 2023-10-17 10:01 [username] Bob [content] 在的，有什么可以帮你？
 ```
 
-本插件解析这些消息并注入 MaiBot，再把 MaiBot 的回复作为 ChatCompletion 响应返回给 QQPilot。旧版本使用 `plugins.QQPilotAdapter.*` 绝对导入，在 MaiBot 新版插件 Runner 中会报 `No module named 'plugins.QQPilotAdapter'`；2.3.0 已改为 SDK 相对导入并重写启动链路。
+本插件解析这些消息并注入 MaiBot，再把 MaiBot 的回复作为 ChatCompletion 响应返回给 QQPilot。旧版本使用 `plugins.QQPilotAdapter.*` 绝对导入，在 MaiBot 新版插件 Runner 中会报 `No module named 'plugins.QQPilotAdapter'`；3.0.0 已改为 SDK 相对导入并重写启动链路。
 
 ## 安装
 
@@ -105,7 +105,7 @@ QQPilot 的请求没有群号，插件会用历史消息指纹和参与者重合
 
 ## 排障
 
-- `No module named 'plugins.QQPilotAdapter'`：确认使用 2.3.0，且插件目录名为 `QQPilotAdapter`。
+- `No module named 'plugins.QQPilotAdapter'`：确认使用 3.0.0，且插件目录名为 `QQPilotAdapter`。
 - `启动 QQPilot HTTP 服务失败`：端口被占用，修改 `server.port` 后重启或热更新配置。
 - `QQPilot 适配器尚未就绪`：查看 MaiBot 日志中是否有网关注册失败或商店/模型初始化错误。
 - `等待 MaiBot 回复超时`：MaiBot 没有产生回复，或 `total_timeout_sec` 太短。QQPilot 会得到空回复。
